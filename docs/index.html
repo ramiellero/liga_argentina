@@ -981,6 +981,7 @@ canvas{display:block;width:100%;cursor:crosshair;}
           <th>#</th><th>Equipo</th>
           <th>PJ</th><th>G</th><th>P</th>
           <th>W%</th><th>PTS/P</th><th>PTS REC/P</th><th>DIF/P</th>
+          <th>LOCAL</th><th>VISITA</th><th>ÚLTIMOS 5</th>
         </tr></thead>
         <tbody id="posNorteTbody"></tbody>
       </table>
@@ -992,6 +993,7 @@ canvas{display:block;width:100%;cursor:crosshair;}
           <th>#</th><th>Equipo</th>
           <th>PJ</th><th>G</th><th>P</th>
           <th>W%</th><th>PTS/P</th><th>PTS REC/P</th><th>DIF/P</th>
+          <th>LOCAL</th><th>VISITA</th><th>ÚLTIMOS 5</th>
         </tr></thead>
         <tbody id="posSurTbody"></tbody>
       </table>
@@ -1074,11 +1076,18 @@ function buildRAW_T(rows) {
     const eq = r['Equipo'];
     if (!map[eq]) map[eq] = {
       Equipo: eq, PJ: 0, Ganados: 0, Perdidos: 0, OPP_PTS: 0,
+      LocalG: 0, LocalP: 0, VisitG: 0, VisitP: 0,
+      _games: [],
       PTS: 0, T2A: 0, T2I: 0, T3A: 0, T3I: 0,
       T1A: 0, T1I: 0, RD: 0, RO: 0, RT: 0, AST: 0, REC: 0, PER: 0, TAP: 0, VAL: 0
     };
     const t = map[eq];
-    t.PJ++; if (r['Ganado'] === 'True') t.Ganados++; else t.Perdidos++;
+    const ganado = r['Ganado'] === 'True';
+    const esLocal = r['Condicion equipos'] === 'LOCAL';
+    t.PJ++; if (ganado) t.Ganados++; else t.Perdidos++;
+    if (esLocal) { if (ganado) t.LocalG++; else t.LocalP++; }
+    else         { if (ganado) t.VisitG++; else t.VisitP++; }
+    t._games.push({ fecha: r['Fecha'], ganado });
     t.PTS += parseFloat(r['Puntos']) || 0;
     t.T2A += parseFloat(r['T2A']) || 0; t.T2I += parseFloat(r['T2I']) || 0;
     t.T3A += parseFloat(r['T3A']) || 0; t.T3I += parseFloat(r['T3I']) || 0;
@@ -1106,6 +1115,12 @@ function buildRAW_T(rows) {
     t['T2%'] = t.T2I > 0 ? Math.round(t.T2A/t.T2I*1000)/10 : null;
     t['T3%'] = t.T3I > 0 ? Math.round(t.T3A/t.T3I*1000)/10 : null;
     t['T1%'] = t.T1I > 0 ? Math.round(t.T1A/t.T1I*1000)/10 : null;
+    t.last5 = t._games
+      .sort((a, b) => {
+        const [ad,am,ay] = a.fecha.split('/'); const [bd,bm,by] = b.fecha.split('/');
+        return new Date(ay,am-1,ad) - new Date(by,bm-1,bd);
+      })
+      .slice(-5).map(g => g.ganado);
   });
   return Object.values(map);
 }
@@ -1963,6 +1978,12 @@ function renderStandings() {
         <td class="pos-pts-f">${(t.PTSPG||0).toFixed(1)}</td>
         <td class="pos-pts-a">${(t.PTSOPP_PG||0).toFixed(1)}</td>
         <td class="${difClass}">${difStr}</td>
+        <td style="color:var(--muted);font-size:.78rem">${t.LocalG}-${t.LocalP}</td>
+        <td style="color:var(--muted);font-size:.78rem">${t.VisitG}-${t.VisitP}</td>
+        <td style="text-align:center">${(t.last5||[]).map(g=>g
+          ? `<span style="color:var(--green);font-weight:700;font-size:.72rem">V</span>`
+          : `<span style="color:var(--red);font-weight:700;font-size:.72rem">D</span>`
+        ).join('<span style="color:var(--muted);opacity:.3;margin:0 1px">·</span>')}</td>
       </tr>`;
     });
   }
